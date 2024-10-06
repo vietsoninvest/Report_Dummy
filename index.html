@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acme De La Vie Sales Dashboard</title>
+
+    <!-- Echarts script -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: #f8f8f8;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin: 20px;
+        }
+        .chart-container {
+            width: 45%;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .slicer-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+        .slicer-container .dropdown {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">Acme De La Vie Sales Dashboard</div>
+    
+    <div class="slicer-container">
+        <div class="dropdown">
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="outletDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Select Outlet
+            </button>
+            <div class="dropdown-menu" aria-labelledby="outletDropdown">
+                <!-- Outlet options will be populated here by JavaScript -->
+            </div>
+        </div>
+        <div class="dropdown">
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="monthDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Select Month
+            </button>
+            <div class="dropdown-menu" aria-labelledby="monthDropdown">
+                <!-- Month options will be populated here by JavaScript -->
+            </div>
+        </div>
+        <div class="dropdown">
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="yearDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Select Year
+            </button>
+            <div class="dropdown-menu" aria-labelledby="yearDropdown">
+                <!-- Year options will be populated here by JavaScript -->
+            </div>
+        </div>
+        <div class="dropdown">
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="brandDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Select Brand
+            </button>
+            <div class="dropdown-menu" aria-labelledby="brandDropdown">
+                <!-- Brand options will be populated here by JavaScript -->
+            </div>
+        </div>
+        <button class="btn btn-danger" id="resetButton">Reset</button>
+    </div>
+
+    <div class="container">
+        <div id="pie-chart" class="chart-container"></div>
+        <div id="line-chart" class="chart-container"></div>
+        <div id="category-by-revenue-chart" class="chart-container"></div>
+        <div id="category-by-qty-chart" class="chart-container"></div>
+        <div id="top-brand-chart" class="chart-container"></div>
+        <div id="platform-chart" class="chart-container"></div>
+
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+    <script src="./static/Scripts/SalesPie.js"></script>
+    <script src="./static/Scripts/SalesLine.js"></script>
+    <script src="./static/Scripts/CategoryByRevenue.js"></script>
+    <script src="./static/Scripts/CategoryByQty.js"></script>
+    <script src="./static/Scripts/TopBrand.js"></script>
+    <script src="./static/Scripts/Platform.js"></script>
+
+    <script>
+        console.log("Starting main script...");
+        // Define the starting year and month
+        const startYear = 2021;
+        const startMonth = 1;
+        const endMonth = 12;
+
+        // Get the current year dynamically
+        const currentYear = new Date().getFullYear();
+
+        // Generate the list of JSON files dynamically up to the current year
+        const jsonFiles = [];
+
+        for (let year = startYear; year <= currentYear; year++) {
+            for (let month = startMonth; month <= endMonth; month++) {
+                // Pad month with leading zero if needed
+                const monthStr = month.toString().padStart(2, '0');
+                const filePath = `./Json/${year}/data_month_${month}.json`;
+                jsonFiles.push(filePath);
+            }
+        }
+        console.log("Generated JSON file paths: ", jsonFiles);
+
+        // Function to fetch all JSON files and combine the data
+        async function fetchData() {
+            let combinedData = [];
+            for (const file of jsonFiles) {
+                try{
+                    const response = await fetch(file);
+                    if (!response.ok) {
+                    throw new Error(`Failed to fetch ${file}: ${response.statusText}`);
+                    
+                }
+                const data = await response.json();
+                combinedData = combinedData.concat(data);
+            }catch(error) {
+                console.error('Error fetching ${file}:', error.message);
+            }
+        }    
+        return combinedData;
+    }
+
+        // Fetch and process the data
+        fetchData().then(data => {
+                console.log("Data received: ", data);   
+
+                const years = [...new Set(data.map(item => new Date(item.Date).getFullYear()))];
+                const months = [...new Set(data.map(item => new Date(item.Date).getMonth() + 1))];
+                const outlets = [...new Set(data.map(item => item.Outlet))];
+                const brands = [...new Set(data.map(item => item.Brand))];
+
+                const yearDropdown = document.getElementById('yearDropdown');
+                const monthDropdown = document.getElementById('monthDropdown');
+                const outletDropdown = document.getElementById('outletDropdown');
+                const brandDropdown = document.getElementById('brandDropdown');
+
+                // Populate year dropdown
+                yearDropdown.nextElementSibling.innerHTML = '';
+                years.forEach(year => {
+                    const option = document.createElement('a');
+                    option.className = 'dropdown-item';
+                    option.href = '#';
+                    option.textContent = year;
+                    yearDropdown.nextElementSibling.appendChild(option);
+                });
+                // Set default year to 2024
+                if (years.includes(2024)) {
+                    const defaultYear = Array.from(yearDropdown.nextElementSibling.children).find(option => option.textContent === '2024');
+                    if (defaultYear) {
+                        defaultYear.classList.add('active');
+                    }
+                }
+
+                // Populate brand dropdown
+                brandDropdown.nextElementSibling.innerHTML = '';
+                brands.forEach(brand => {
+                    const option = document.createElement('a');
+                    option.className = 'dropdown-item';
+                    option.href = '#';
+                    option.textContent = brand;
+                    brandDropdown.nextElementSibling.appendChild(option);
+                });
+
+                // Populate outlet dropdown
+                outletDropdown.nextElementSibling.innerHTML = '';
+                outlets.forEach(outlet => {
+                    const option = document.createElement('a');
+                    option.className = 'dropdown-item';
+                    option.href = '#';
+                    option.textContent = outlet;
+                    option.setAttribute('data-value', outlet); // Adding a data attribute for outlet
+                    outletDropdown.nextElementSibling.appendChild(option);
+                });
+
+                // Populate month dropdown
+                monthDropdown.nextElementSibling.innerHTML = '';
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                monthNames.forEach((month, index) => {
+                    const option = document.createElement('a');
+                    option.className = 'dropdown-item';
+                    option.href = '#';
+                    option.textContent = month;
+                    option.setAttribute('data-value', index + 1); // Adding a data attribute for month index
+                    monthDropdown.nextElementSibling.appendChild(option);
+                });
+
+                const updateCharts = () => {
+                    const selectedYears = [...document.querySelectorAll('#yearDropdown + .dropdown-menu a.active')].map(option => parseInt(option.textContent));
+                    const selectedMonths = [...document.querySelectorAll('#monthDropdown + .dropdown-menu a.active')].map(option => parseInt(option.getAttribute('data-value')));
+                    const selectedOutlets = [...document.querySelectorAll('#outletDropdown + .dropdown-menu a.active')].map(option => option.getAttribute('data-value'));
+                    const selectedBrands = [...document.querySelectorAll('#brandDropdown + .dropdown-menu a.active')].map(option => option.textContent);
+
+                    console.log("Selected Years:", selectedYears);
+                    console.log("Selected Months:", selectedMonths);
+                    console.log("Selected Outlets:", selectedOutlets);
+                    console.log("Selected Brands:", selectedBrands);
+
+                    const filteredData = data.filter(item => 
+                        (selectedYears.length === 0 || selectedYears.includes(new Date(item.Date).getFullYear())) &&
+                        (selectedMonths.length === 0 || selectedMonths.includes(new Date(item.Date).getMonth() + 1)) &&
+                        (selectedOutlets.length === 0 || selectedOutlets.includes(item.Outlet)) &&
+                        (selectedBrands.length === 0 || selectedBrands.includes(item.Brand))
+                    );
+
+                    const filteredDataForLineChart = data.filter(item =>
+                        (selectedYears.length === 0 || selectedYears.includes(new Date(item.Date).getFullYear())) &&
+                        (selectedOutlets.length === 0 || selectedOutlets.includes(item.Outlet)) &&
+                        (selectedBrands.length === 0 || selectedBrands.includes(item.Brand))
+                    );
+
+                    console.log("Filtered Data:", filteredData);
+
+                    // Update Pie chart
+                    updatePieChart(filteredData, selectedOutlets);
+
+                    // Update Line Chart without filtering Months
+                    updateLineChart(filteredDataForLineChart, selectedOutlets);
+
+                    // Update Category Rank by Revenue chart
+                    updateCategoryByRevenueChart(filteredData, selectedOutlets);
+
+                    // Update Category Rank by Qty chart
+                    updateCategoryByQtyChart(filteredData, selectedOutlets);
+
+                    // Update Brand chart
+                    updateTopBrandChart(filteredData, selectedOutlets);
+                    
+                    // Update Platform chart
+                    updatePlatformChart(filteredData, selectedOutlets);
+                    
+                    // Update HeatMap
+                    updateHeatMap(filteredData);                    
+
+
+                };
+
+                document.querySelectorAll('#yearDropdown + .dropdown-menu a').forEach(item => {
+                    item.addEventListener('click', function() {
+                        document.querySelectorAll('#yearDropdown + .dropdown-menu a').forEach(option => option.classList.remove('active'));
+                        item.classList.add('active');
+                        updateCharts();
+                    });
+                });
+
+                document.querySelectorAll('#brandDropdown + .dropdown-menu a').forEach(item => {
+                    item.addEventListener('click', function() {
+                        item.classList.toggle('active');
+                        updateCharts();
+                    });
+                });
+
+                document.querySelectorAll('#outletDropdown + .dropdown-menu a').forEach(item => {
+                    item.addEventListener('click', function() {
+                        item.classList.toggle('active');
+                        updateCharts();
+                    });
+                });
+
+                document.querySelectorAll('#monthDropdown + .dropdown-menu a').forEach(item => {
+                    item.addEventListener('click', function() {
+                        item.classList.toggle('active');
+                        updateCharts();
+                    });
+                });
+
+                document.getElementById('resetButton').addEventListener('click', function() {
+                    document.querySelectorAll('#yearDropdown + .dropdown-menu a').forEach(option => option.classList.remove('active'));
+                    if (years.includes(2024)) {
+                        const defaultYear = Array.from(yearDropdown.nextElementSibling.children).find(option => option.textContent === '2024');
+                        if (defaultYear) {
+                            defaultYear.classList.add('active');
+                        }
+                    }
+                    
+                    document.querySelectorAll('#brandDropdown + .dropdown-menu a').forEach(option => option.classList.remove('active'));
+                    document.querySelectorAll('#outletDropdown + .dropdown-menu a').forEach(option => option.classList.remove('active'));
+                    document.querySelectorAll('#monthDropdown + .dropdown-menu a').forEach(option => option.classList.remove('active'));
+
+                    updateCharts();
+                });
+
+                updateCharts(); // Initial chart rendering with default selections
+            })
+            .catch(error => {
+                console.error("Error fetching data: ", error);
+            });
+
+        console.log("Main script executed...");
+    </script>
+</body>
+</html>
